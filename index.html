@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的食谱平台</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .container {
+            border: 1px solid #ccc;
+            padding: 2rem;
+            border-radius: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: .5rem;
+            font-weight: bold;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: .5rem;
+            margin-bottom: .5rem;
+        }
+
+        button {
+            background-color: #0078d4;
+            color: white;
+            padding: .5rem 1rem;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #005a9e;
+        }
+
+        #status {
+            margin-top: 1rem;
+            padding: 1rem;
+            display: none;
+        }
+
+        .success {
+            background-color: #dff6dd;
+            color: #107c10;
+        }
+
+        .error {
+            background-color: #fde7e9;
+            color: #a80000;
+        }
+
+        img {
+            max-width: 300px;
+            margin-top: 10px;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🍳 上传新食谱</h1>
+
+        <div class="form-group">
+            <label>1. 先上传食谱封面图</label>
+            <input type="file" id="imageFile" accept="image/*">
+            <button onclick="uploadImage()">上传图片</button>
+            <p id="imageStatus" style="font-size: 0.9em; color: gray;"></p>
+            <img id="previewImg" src="" style="display:none;">
+        </div>
+
+        <hr>
+
+        <div class="form-group">
+            <label>2. 填写食谱详情</label>
+            <input type="text" id="title" placeholder="食谱名称 (比如: 西红柿炒蛋)">
+            <textarea id="description" rows="3" placeholder="简短描述..."></textarea>
+            <input type="text" id="ingredients" placeholder="配料 (用逗号隔开，比如: 鸡蛋,西红柿,葱)">
+            <input type="text" id="steps" placeholder="步骤 (用逗号隔开，比如: 切菜,炒菜,出锅)">
+
+            <input type="hidden" id="uploadedImageUrl">
+
+            <button onclick="submitRecipe()" style="width: 100%; margin-top: 10px; font-size: 1.1em;">提交食谱</button>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🔴 这里的 URL 是不是你刚才填的那个？请检查！
+        // ==========================================
+        const API_BASE_URL = "https://recipe-api-jiarun-h2hwd6dufzech6es.uksouth-01.azurewebsites.net/api";
+
+        async function uploadImage() {
+            const fileInput = document.getElementById('imageFile');
+            const status = document.getElementById('imageStatus');
+            const file = fileInput.files[0];
+
+            if (!file) { alert("请先选择一张图片！"); return; }
+
+            status.innerText = "正在上传图片...";
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // 调用上传图片的接口
+                const response = await fetch(`${API_BASE_URL}/UploadMedia`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    status.innerText = "✅ 图片上传成功！";
+                    // 把返回的图片 URL 存起来
+                    document.getElementById('uploadedImageUrl').value = data.url;
+                    // 显示预览
+                    document.getElementById('previewImg').src = data.url;
+                    document.getElementById('previewImg').style.display = 'block';
+                } else {
+                    status.innerText = "❌ 图片上传失败";
+                }
+            } catch (error) {
+                console.error(error);
+                status.innerText = "❌ 网络错误: " + error.message;
+            }
+        }
+
+        async function submitRecipe() {
+            const status = document.getElementById('status');
+            const title = document.getElementById('title').value;
+            const imageUrl = document.getElementById('uploadedImageUrl').value;
+
+            if (!title) { alert("请输入标题！"); return; }
+            if (!imageUrl) { alert("请先上传图片！"); return; }
+
+            status.style.display = 'block';
+            status.className = '';
+            status.innerText = "正在保存食谱...";
+
+            const recipeData = {
+                title: title,
+                description: document.getElementById('description').value,
+                ingredients: document.getElementById('ingredients').value.split(','),
+                steps: document.getElementById('steps').value.split(','),
+                main_photo_url: imageUrl  // 把刚才的图片链接带上
+            };
+
+            try {
+                // 调用上传食谱的接口
+                const response = await fetch(`${API_BASE_URL}/UploadRecipe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(recipeData)
+                });
+
+                if (response.ok) {
+                    status.className = 'success';
+                    status.innerHTML = "🎉 <b>大功告成！</b> 食谱已保存到云端数据库！";
+                } else {
+                    status.className = 'error';
+                    status.innerText = "保存失败: " + await response.text();
+                }
+            } catch (error) {
+                status.className = 'error';
+                status.innerText = "网络错误: " + error.message;
+            }
+        }
+    </script>
+</body>
+
+</html>
